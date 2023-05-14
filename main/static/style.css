@@ -1,0 +1,21 @@
+table, th, td {
+    border:1px solid black;
+  }
+td, th {
+    padding: 4px;
+  }
+tr:hover {
+    background-color: #e0e0e0;
+  }
+
+.table-sortable th {
+    cursor: pointer;
+  }
+  
+.table-sortable .th-sort-asc::after {
+    content: "\25b4";
+  }
+  
+.table-sortable .th-sort-desc::after {
+    content: "\25be";
+  }

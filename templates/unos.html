@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <title>Unos podataka</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+
+    <style>
+      .page_margin{
+        margin: 10px;
+       }
+    </style>   
+
+  </head>
+<body>
+  <nav class="navbar navbar-dark bg-dark">
+    <div class="container-fluid">
+    <ul class="nav nav-tabs mx-auto">
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'main:index' %}">Home</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link active" href="{% url 'main:unos' %}">Unos podataka</a>
+      </li>
+      
+      {% if not is_superuser %}
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'main:user' %}">Korisnička stranica</a>
+      </li>
+      {% endif %}
+
+      <li class="nav-item">
+        <form class="form-inline my-2 my-lg-0 ml-4" method="POST" action="{% url 'main:book-search' %}">
+          {% csrf_token %}
+          <select class="form-control" name="search_type">
+            <option value="title">Naziv knjige</option>
+            <option value="author">Autor</option>
+          </select>
+          <input class="form-control mr-sm-2" type="search" placeholder="Pretraga" aria-label="Search" name="search_term">
+          <button class="btn btn-outline-success my-2 my-sm-0" type="submit">Pretraga</button>
+        </form>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link ml-4" href="{% url 'main:admin-page' %}">Svi korisnici (admin stranica)</a>
+      </li>
+
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          Registracija
+        </a>
+        <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+         <a class="dropdown-item" href="{% url 'main:register' %}">Korisnik</a>
+         <a class="dropdown-item" href="{% url 'main:register_superuser' %}">Admin</a>
+        </div>
+      </li> 
+      
+      <li class="nav-item">
+        <a class="nav-link " href="">Postavke</a>
+      </li>
+
+      {% if uid %}
+      <li class="nav-item">
+        <a class="nav-link" style="color: red;" href="{% url 'main:logout' %}">Log out</a>
+      </li>
+      {% else %}
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'main:login' %}">Log in</a>
+      </li>
+      {% endif %}
+    </ul>
+  </div>
+  </nav>
+
+ <main class="page_margin">
+  {% if username %}
+  <h5>Korisnik: {{username}}</h5>
+ {% endif %}
+ <hr>
+ <h3>Unos nove knjige</h3>
+ <form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button type="submit">Add book</button>
+</form>
+ </main>
+
+ 
+</body>
+</html>

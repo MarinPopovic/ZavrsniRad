@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% load static %}
+    <meta charset="UTF-8">
+    <title>Admin stranica</title>
+    <link rel="stylesheet" type="text/css" href="{% static 'style.css' %}">
+</head>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+
+<style>
+  .page_margin{
+    margin: 10px;
+   }
+
+  li {
+      list-style-type: none;
+      float: left;
+    }
+  
+  li a {
+      padding: 14px;
+      font-size: 19px;
+      text-decoration: none;
+  }
+  
+  li a:hover {
+      background-color: #5FEDFA;
+      color: white;
+    }
+    
+</style>
+<body>
+  <nav class="navbar navbar-dark bg-dark">
+    <div class="container-fluid">
+    <ul class="nav nav-tabs mx-auto">
+      <li class="nav-item">
+        <a class="nav-link active" href="{% url 'main:index' %}">Home</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'main:unos' %}">Unos podataka</a>
+      </li>
+      
+      {% if not is_superuser %}
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'main:user' %}">Korisnička stranica</a>
+      </li>
+      {% endif %}
+
+      <li class="nav-item">
+        <form class="form-inline my-2 my-lg-0 ml-4" method="GET" action="{% url 'main:book-search' %}">
+          {% csrf_token %}
+          <select class="form-control" name="search_type">
+            <option value="title">Naziv knjige</option>
+            <option value="author">Autor</option>
+          </select>
+          <input class="form-control mr-sm-2" type="search" placeholder="Pretraga" aria-label="Search" name="search_term">
+          <button class="btn btn-outline-success my-2 my-sm-0" type="submit">Pretraga</button>
+        </form>
+      </li>
+
+      {% if is_superuser %}
+      <li class="nav-item">
+        <a class="nav-link ml-4" href="{% url 'main:admin-page' %}">Svi korisnici (admin stranica)</a>
+      </li>
+      {% endif %}
+
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          Registracija
+        </a>
+        <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+         <a class="dropdown-item" href="{% url 'main:register' %}">Korisnik</a>
+         <a class="dropdown-item" href="{% url 'main:register_superuser' %}">Admin</a>
+        </div>
+      </li> 
+
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          Postavke (ne radi)
+        </a>
+        <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+         <a class="dropdown-item" href="">Pormjena korisničkog imena</a>
+         <a class="dropdown-item" href="">Pormjena email adrese imena</a>
+         <a class="dropdown-item" href="">Pormjena lozinke</a>
+        </div>
+      </li> 
+
+      {% if uid %}
+      <li class="nav-item">
+        <a class="nav-link" style="color: red;" href="{% url 'main:logout' %}">Log out</a>
+      </li>
+      {% else %}
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'main:login' %}">Log in</a>
+      </li>
+      {% endif %}
+    </ul>
+  </div>
+  </nav>
+
+<main class="page_margin">
+    <table>
+        <input type="text" id="myInput" onkeyup="filterTable()" placeholder="Filtriranje korisnika: unesite email" title="Type in a email" size="30">
+        <thead>
+          <tr>
+            <th>UID (User ID)</th>
+            <th>Email</th>
+            <th>Username</th>
+            <th>Opcije (ne radi)</th>
+            <!-- <th>Account created</th> -->
+            <!-- <th>Last login date</th> -->
+          </tr>
+        </thead>
+        <tbody>
+          {% for user in user_data %}
+          <tr>
+            <td>{{ user.uid }}</td>
+            <td>{{ user.email }}</td>
+            <td>{{ user.username }}</td>
+            <td>
+                <div class="dropdown">
+                    <span class="dropdown-toggle" id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <i class="fas fa-ellipsis-v"></i>
+                      </span>
+                    <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+                      <a class="dropdown-item" href="#">Promjena lozinke</a>
+                      <a class="dropdown-item" href="#">Obriši korisnika</a>
+                    </div>
+                  </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+</main> 
+
+  <script src="{% static 'filterTable.js' %}"></script>
+
+  <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/popper.js@1.14.7/dist/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+</body>
+</html>

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Book by {{ publisher }}</title>
+</head>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+
+<style>
+  .page_margin{
+    margin: 10px;
+   }
+
+  table, th, td {
+      border:1px solid black;
+    }
+  tr:hover {
+      background-color: #e0e0e0;
+    }
+
+  li {
+      list-style-type: none;
+      float: left;
+      overflow: hidden;
+       }
+  
+  li a {
+      padding: 14px;
+      font-size: 19px;
+      text-decoration: none;
+  }
+  
+  li a:hover {
+      background-color: #5FEDFA;
+      color: white;
+    }
+    </style>
+<body>
+
+  <nav class="navbar navbar-dark bg-dark">
+    <div class="container-fluid">
+    <ul class="nav nav-tabs mx-auto">
+      <li class="nav-item">
+        <a class="nav-link active" href="{% url 'main:index' %}">Home</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'main:unos' %}">Unos podataka</a>
+      </li>
+      
+      {% if not is_superuser %}
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'main:user' %}">Korisnička stranica</a>
+      </li>
+      {% endif %}
+
+      <li class="nav-item">
+        <form class="form-inline my-2 my-lg-0 ml-4" method="GET" action="{% url 'main:book-search' %}">
+          {% csrf_token %}
+          <select class="form-control" name="search_type">
+            <option value="title">Naziv knjige</option>
+            <option value="author">Autor</option>
+          </select>
+          <input class="form-control mr-sm-2" type="search" placeholder="Pretraga" aria-label="Search" name="search_term">
+          <button class="btn btn-outline-success my-2 my-sm-0" type="submit">Pretraga</button>
+        </form>
+      </li>
+
+      {% if is_superuser %}
+      <li class="nav-item">
+        <a class="nav-link ml-4" href="{% url 'main:admin-page' %}">Svi korisnici (admin stranica)</a>
+      </li>
+      {% endif %}
+
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          Registracija
+        </a>
+        <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+         <a class="dropdown-item" href="{% url 'main:register' %}">Korisnik</a>
+         <a class="dropdown-item" href="{% url 'main:register_superuser' %}">Admin</a>
+        </div>
+      </li> 
+
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          Postavke (ne radi)
+        </a>
+        <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+         <a class="dropdown-item" href="">Pormjena korisničkog imena</a>
+         <a class="dropdown-item" href="">Pormjena email adrese imena</a>
+         <a class="dropdown-item" href="">Pormjena lozinke</a>
+        </div>
+      </li> 
+
+      {% if uid %}
+      <li class="nav-item">
+        <a class="nav-link" style="color: red;" href="{% url 'main:logout' %}">Log out</a>
+      </li>
+      {% else %}
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'main:login' %}">Log in</a>
+      </li>
+      {% endif %}
+    </ul>
+  </div>
+  </nav>
+
+<main class="page_margin">
+  {% if username %}
+  <h5>Korisnik: {{username}}</h5>
+ {% endif %}
+ <hr>
+ <br>
+ <h3>Books published by {{ publisher }}</h3>
+ <hr>
+ <table class="table table-hover table-sortable">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Title</th>
+      <th>Author</th>
+      <th>Publisher</th>
+      <th>Genre</th>
+      <th>Country</th>
+      <th>Year</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for book in books %}
+    <tr>
+      <td><a href="{% url 'main:book-show' book.ID %}" style="color: inherit;">{{ book.ID }}</a></td>
+      <td><a href="{% url 'main:book-show' book.ID %}" style="color: inherit;">{{ book.Title }}</a></td>
+      <td><a href="{% url 'main:books-by-author' author=book.Author %}" style="color: inherit;">{{ book.Author }}</a></td>
+      <td><a href="{% url 'main:books-by-publisher' publisher=book.Publisher %}" style="color: inherit;">{{ book.Publisher }}</a></td>
+      <td>{{ book.Genre }}</td>
+      <td>{{ book.Country }}</td>
+      <td>{{ book.Year }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+ </table>
+</main> 
+
+  <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/popper.js@1.14.7/dist/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+</body>
+</html>

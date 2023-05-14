@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Books by {{ genre }}</title>
+</head>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+
+<style>
+  .page_margin{
+    margin: 10px;
+   }
+
+  table, th, td {
+      border:1px solid black;
+    }
+    td, th {
+      padding: 4px;
+    }
+  tr:hover {
+      background-color: #e0e0e0;
+    }
+
+  li {
+      list-style-type: none;
+      float: left;
+      overflow: hidden;
+       }
+  
+  li a {
+      padding: 14px;
+      font-size: 19px;
+      text-decoration: none;
+  }
+  
+  li a:hover {
+      background-color: #5FEDFA;
+      color: white;
+    }
+    </style>
+<body>
+
+  <nav class="navbar navbar-dark bg-dark">
+    <ul class="nav nav-tabs">
+      <li class="nav-item">
+        <a class="nav-link" href="">Home</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link " href="{% url 'main:unos' %}">Unos podataka</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link" href="">Kosarica</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'main:user' %}">User page</a>
+      </li>
+
+      <form class="form-inline my-2 my-lg-0">
+        <input class="form-control mr-sm-2" type="search" placeholder="Unesite naziv knjige" aria-label="Search">
+        <button class="btn btn-outline-success my-2 my-sm-0" type="submit">Pretraga</button>
+      </form>
+
+      <li class="nav-item">
+        <a class="nav-link " href="">Registracija</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link " style="color: red;" href="">Log out</a>
+      </li>
+    </ul>
+  </nav>
+
+<main class="page_margin">
+ <h1>{{ genre }}</h1>  
+ <table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Title</th>
+      <th>Author</th>
+      <th>Publisher</th>
+      <th>Genre</th>
+      <th>Country</th>
+      <th>Year</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for book in books %}
+    <tr>
+      <td><a href="{% url 'main:knjiga-prikaz' book.ID %}" style="color: inherit;">{{ book.ID }}</a></td>
+      <td><a href="{% url 'main:knjiga-prikaz' book.ID %}" style="color: inherit;">{{ book.Title }}</a></td>
+      <td><a href="{% url 'main:books-by-author' author=book.Author %}" style="color: inherit;">{{ book.Author }}</a></td>
+      <td>{{ book.Publisher }}</td>
+      <td>{{ book.Country }}</td>
+      <td>{{ book.Year }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+ </table>
+</main> 
+
+  <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/popper.js@1.14.7/dist/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+</body>
+</html>

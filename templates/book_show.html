@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    {% load static %}
+    <meta charset="UTF-8">
+    <title>Prikaz</title>
+    <link rel="stylesheet" type="text/css" href="{% static 'style.css' %}">
+  </head>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+
+  <style>
+    .page_margin{
+      margin: 10px;
+     }
+     .h3{
+      display: inline-block;
+      margin: 0;
+      padding: 0;
+     }
+     .h6{
+      display: inline-block;
+      margin: 0;
+      padding: 0;
+     }
+  </style>
+
+  <body>
+    <nav class="navbar navbar-dark bg-dark">
+      <div class="container-fluid">
+      <ul class="nav nav-tabs mx-auto">
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'main:index' %}">Home</a>
+        </li>
+  
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'main:unos' %}">Unos podataka</a>
+        </li>
+
+        {% if not is_superuser %}
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'main:user' %}">Korisnička stranica</a>
+        </li>
+        {% endif %}
+  
+        <li class="nav-item">
+          <form class="form-inline my-2 my-lg-0 ml-4" method="POST" action="{% url 'main:book-search' %}">
+            {% csrf_token %}
+            <select class="form-control" name="search_type">
+              <option value="title">Naziv knjige</option>
+              <option value="author">Autor</option>
+            </select>
+            <input class="form-control mr-sm-2" type="search" placeholder="Pretraga" aria-label="Search" name="search_term">
+            <button class="btn btn-outline-success my-2 my-sm-0" type="submit">Pretraga</button>
+          </form>
+        </li>
+  
+        <li class="nav-item">
+          <a class="nav-link ml-4" href="{% url 'main:admin-page' %}">Svi korisnici (admin page)</a>
+        </li>
+  
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            Registracija
+          </a>
+          <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+           <a class="dropdown-item" href="{% url 'main:register' %}">Korisnik</a>
+           <a class="dropdown-item" href="{% url 'main:register_superuser' %}">Admin</a>
+          </div>
+        </li>   
+  
+        {% if uid %}
+        <li class="nav-item">
+          <a class="nav-link" style="color: red;" href="{% url 'main:logout' %}">Log out</a>
+        </li>
+        {% else %}
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'main:login' %}">Log in</a>
+        </li>
+        {% endif %}
+      </ul>
+    </div>
+    </nav>  
+    
+    <main class="page_margin">
+      {% if username %}
+      <h5>Korisnik: {{username}}</h5>
+     {% endif %}
+     <hr>
+        {{ book.Title }}
+        <h6 style="color:grey; display:inline;"><strong style="color:grey;">#ID:</strong> {{ book.ID }}</h6>
+        <p><strong>Author:</strong> {{ book.Author }}</p>
+        <p><strong>Publisher:</strong> {{ book.Publisher }}</p>
+        <p><strong>Genre:</strong> {{ book.Genre }}</p>
+        <p><strong>Country:</strong> {{ book.Country }}</p>
+        <p><strong>Print length:</strong> {{ book.Print_length }}</p>
+        <p><strong>Year:</strong> {{ book.Year }}</p>
+        <p><strong>Quantity:</strong> {{ book.Kolicina }}</p>
+        <br>
+
+        <a href="{% url 'main:index' %}" class="btn btn-secondary">Back to homepage</a>
+
+        {% if is_superuser %}
+        <a href="{% url 'main:update-book' knjiga_id=book.ID %}" class="btn btn-secondary">Update</a>
+
+        <form method="post" action="{% url 'main:delete-book' knjiga_id=book.ID %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-danger" onclick="return potvrda()">Delete</button>
+        </form>
+        {% endif %}
+
+        {% if not is_superuser %}
+         {% if is_borrowed %}
+         <button type="button" class="btn btn-primary" disabled>Add to wishlist</button>
+         {% elif is_on_wishlist %}
+         <button class="btn btn-success" disabled>Item on wishlist</button>
+         {% else %}
+         <a href="{% url 'main:add-to-wishlist' knjiga_id=knjiga_id %}" class="btn btn-light border">Add to wishlist</a>
+         {% endif %}
+        
+         {% if is_borrowed %}
+         <button class="btn btn-success" disabled>Item borrowed</button>
+         {% else %}
+         <a href="{% url 'main:borrow-book' knjiga_id=knjiga_id %}" class="btn btn-light border" onclick="return confirm_borrow()">Borrow</a>
+         {% endif %}
+        {% endif %}
+    </main>
+
+    <script src="{% static 'potvrda.js' %}"></script>
+    <script src="{% static 'confirm_borrow.js' %}"></script>
+
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.14.7/dist/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+  </body>
+</html>

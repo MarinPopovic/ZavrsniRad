@@ -15,7 +15,7 @@ import tempfile
 
 # Initialize Firebase Admin SDK
 #This is used for updating the email adress in the Firebase's Authentication page
-cred = credentials.Certificate("./secrets/zavrsnirad-d6160-firebase-adminsdk-c68do-afe21305d5.json")
+cred = credentials.Certificate("./main/zavrsnirad-d6160-firebase-adminsdk-c68do-afe21305d5.json")
 firebase_admin.initialize_app(cred)
 
 config={

@@ -1,11 +1,9 @@
-table, th, td {
-    border:1px solid black;
-  }
+
 td, th {
     padding: 4px;
-  }
+  } 
 tr:hover {
-    background-color: #e0e0e0;
+    background-color: #4d4a4a;
   }
 
 .table-sortable th {
@@ -18,4 +16,12 @@ tr:hover {
   
 .table-sortable .th-sort-desc::after {
     content: "\25be";
+  }
+
+.table-scroll {
+    border-radius: .5rem;
+  }
+  
+.table-scroll table thead th {
+    font-size: 1.25rem;
   }

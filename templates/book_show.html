@@ -3,7 +3,7 @@
   <head>
     {% load static %}
     <meta charset="UTF-8">
-    <title>Prikaz</title>
+    <title>{{ book.Title }}</title>
     <link rel="stylesheet" type="text/css" href="{% static 'style.css' %}">
   </head>
 
@@ -13,16 +13,50 @@
     .page_margin{
       margin: 10px;
      }
-     .h3{
-      display: inline-block;
-      margin: 0;
-      padding: 0;
+     body {
+      background-image: url('https://img.freepik.com/free-vector/realistic-white-monochrome-background_23-2149003414.jpg?w=1380&t=st=1687868094~exp=1687868694~hmac=7cb387786a49f9ce93bb6bc4843543e48f66a94667a5d95d4716150fad284c16');
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+      background-size: cover;
+    }
+     .center {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .card-description {
+      height: 150px; /* Adjust the desired height here */
+      overflow-y: auto;
      }
-     .h6{
-      display: inline-block;
-      margin: 0;
-      padding: 0;
+     html{
+      zoom: 90%;
      }
+     li {
+      list-style-type: none;
+      float: left;
+    }
+    
+    li a {
+      padding: 14px;
+      font-size: 19px;
+      text-decoration: none;
+      color: white;
+    }
+    
+    li a:hover {
+      background-color: grey;
+      color: white;
+    }   
+     footer {
+      position: fixed;
+      left: 0;
+      bottom: 0;
+      width: 100%;
+      background-color: #2d2e2d;
+      color: white;
+      text-align: center;
+      height: 50px;
+      } 
   </style>
 
   <body>
@@ -30,34 +64,39 @@
       <div class="container-fluid">
       <ul class="nav nav-tabs mx-auto">
         <li class="nav-item">
-          <a class="nav-link" href="{% url 'main:index' %}">Home</a>
+          <a class="nav-link active" href="{% url 'main:index' %}">Home</a>
         </li>
   
+        {% if is_superuser %}
         <li class="nav-item">
-          <a class="nav-link" href="{% url 'main:unos' %}">Unos podataka</a>
+          <a class="nav-link" href="{% url 'main:upload-book' %}">Unos podataka</a>
         </li>
-
-        {% if not is_superuser %}
+        {% endif %}
+        
+        {% if uid and not is_superuser %}
         <li class="nav-item">
           <a class="nav-link" href="{% url 'main:user' %}">Korisnička stranica</a>
         </li>
         {% endif %}
   
         <li class="nav-item">
-          <form class="form-inline my-2 my-lg-0 ml-4" method="POST" action="{% url 'main:book-search' %}">
+          <form class="form-inline my-2 my-lg-0 ml-4" method="GET" action="{% url 'main:book-search' %}">
             {% csrf_token %}
             <select class="form-control" name="search_type">
               <option value="title">Naziv knjige</option>
               <option value="author">Autor</option>
+              <option value="publisher">Izdavač</option>
             </select>
-            <input class="form-control mr-sm-2" type="search" placeholder="Pretraga" aria-label="Search" name="search_term">
-            <button class="btn btn-outline-success my-2 my-sm-0" type="submit">Pretraga</button>
+            <input class="form-control mr-sm-2" type="search" placeholder="Pretraga" aria-label="Search" name="search_term" id="search-term-input">
+            <button class="btn btn-outline-success my-2 my-sm-0" type="submit" id="search-button" disabled>Pretraga</button>
           </form>
         </li>
   
+        {% if is_superuser %}
         <li class="nav-item">
-          <a class="nav-link ml-4" href="{% url 'main:admin-page' %}">Svi korisnici (admin page)</a>
+          <a class="nav-link ml-4" href="{% url 'main:admin-page' %}">Svi korisnici (admin stranica)</a>
         </li>
+        {% endif %}
   
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
@@ -65,9 +104,17 @@
           </a>
           <div class="dropdown-menu" aria-labelledby="navbarDropdown">
            <a class="dropdown-item" href="{% url 'main:register' %}">Korisnik</a>
+           {% if is_superuser %}
            <a class="dropdown-item" href="{% url 'main:register_superuser' %}">Admin</a>
+           {% endif %}
           </div>
-        </li>   
+        </li> 
+  
+        {% if uid %}
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'main:settings-main' %}">Postavke</a>
+        </li>
+        {% endif %}
   
         {% if uid %}
         <li class="nav-item">
@@ -85,49 +132,72 @@
     <main class="page_margin">
       {% if username %}
       <h5>Korisnik: {{username}}</h5>
+
      {% endif %}
-     <hr>
-        {{ book.Title }}
-        <h6 style="color:grey; display:inline;"><strong style="color:grey;">#ID:</strong> {{ book.ID }}</h6>
-        <p><strong>Author:</strong> {{ book.Author }}</p>
-        <p><strong>Publisher:</strong> {{ book.Publisher }}</p>
-        <p><strong>Genre:</strong> {{ book.Genre }}</p>
-        <p><strong>Country:</strong> {{ book.Country }}</p>
-        <p><strong>Print length:</strong> {{ book.Print_length }}</p>
-        <p><strong>Year:</strong> {{ book.Year }}</p>
-        <p><strong>Quantity:</strong> {{ book.Kolicina }}</p>
-        <br>
+     <div class="center">
+        <div class="card" style="width: 18rem;">
+          <img class="card-img-top" src="{{ image_url }}" alt="Author Image">
+          <div class="card-body">
+            <h5 class="card-title">{{ book.Title }} ({{ book.Year }}), <br>ID: {{ book.ID }} </h5>
+            <div class="card-description">
+             <p class="card-text">{{ book.Description }}</p>
+            </div>
+          </div>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item"><strong>Author:</strong> {{ book.Author }} <br><strong>Country:</strong>{{ book.Country }}</li>
+            <li class="list-group-item"><strong>Publisher:</strong> {{ book.Publisher }} </li>
+            <li class="list-group-item"><strong>Genre:</strong> {{ book.Genre }} </li>
+            <li class="list-group-item"><strong>Print length:</strong> {{ book.Print_length }}, <strong>Quantity:</strong> {{ book.Quantity }} </li>
+          </ul>
+          <div class="card-body">
+            <!-- <a href="{% url 'main:index' %}" class="btn btn-secondary">Back to homepage</a> -->
 
-        <a href="{% url 'main:index' %}" class="btn btn-secondary">Back to homepage</a>
+            <div class="btn-group" role="group">
+            {% if is_superuser %}
+            <a href="{% url 'main:update-book' knjiga_id=book.ID %}" class="btn btn-secondary">Update</a>
+    
+            <form method="post" action="{% url 'main:delete-book' knjiga_id=book.ID %}">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-danger" style="margin-left: 3px;" onclick="return potvrda()">Delete</button>
+            </form>
+            {% endif %}
+            </div>
+    
+            <div class="btn-group" role="group">
+            {% if not is_superuser %}
+             {% if is_borrowed %}
+             <button type="button" class="btn btn-primary" disabled>Add to wishlist</button>
+             {% elif is_on_wishlist %}
+             <button class="btn btn-success" disabled>Item on wishlist</button>
+             {% else %}
+             <a href="{% url 'main:add-to-wishlist' knjiga_id=knjiga_id %}" class="btn btn-light border">Add to wishlist</a>
+             {% endif %}
+            
+             {% if is_borrowed %}
+             <button class="btn btn-success" disabled>Borrowed</button>
+             {% elif is_max_limit_reached %}
+             <button class="btn btn-danger" disabled>Max limit reached</button>
+             {% else %}
+             <a href="{% url 'main:borrow-book' knjiga_id=knjiga_id %}" class="btn btn-light border" onclick="return confirm_borrow()">Borrow</a>
+             {% endif %}
+            {% endif %}
+            </div>
 
-        {% if is_superuser %}
-        <a href="{% url 'main:update-book' knjiga_id=book.ID %}" class="btn btn-secondary">Update</a>
+            <br><a href="{% url 'main:index' %}">Back to homepage</a>
+          </div>
+        </div>
+      </div>
 
-        <form method="post" action="{% url 'main:delete-book' knjiga_id=book.ID %}">
-          {% csrf_token %}
-          <button type="submit" class="btn btn-danger" onclick="return potvrda()">Delete</button>
-        </form>
-        {% endif %}
-
-        {% if not is_superuser %}
-         {% if is_borrowed %}
-         <button type="button" class="btn btn-primary" disabled>Add to wishlist</button>
-         {% elif is_on_wishlist %}
-         <button class="btn btn-success" disabled>Item on wishlist</button>
-         {% else %}
-         <a href="{% url 'main:add-to-wishlist' knjiga_id=knjiga_id %}" class="btn btn-light border">Add to wishlist</a>
-         {% endif %}
-        
-         {% if is_borrowed %}
-         <button class="btn btn-success" disabled>Item borrowed</button>
-         {% else %}
-         <a href="{% url 'main:borrow-book' knjiga_id=knjiga_id %}" class="btn btn-light border" onclick="return confirm_borrow()">Borrow</a>
-         {% endif %}
-        {% endif %}
     </main>
+
+    <footer>
+      <p>Završni rad 2023<br>
+      Autor: Marin Popović</p>
+     </footer>
 
     <script src="{% static 'potvrda.js' %}"></script>
     <script src="{% static 'confirm_borrow.js' %}"></script>
+    <script src="{% static 'search_bar_input.js' %}"></script>
 
     <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/popper.js@1.14.7/dist/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>

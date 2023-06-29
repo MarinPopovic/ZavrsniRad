@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <title>Unos podataka</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+
+    <style>
+      .page_margin{
+        margin: 10px;
+       }
+       body {
+        background-image: url('https://img.freepik.com/free-vector/realistic-white-monochrome-background_23-2149003414.jpg?w=1380&t=st=1687868094~exp=1687868694~hmac=7cb387786a49f9ce93bb6bc4843543e48f66a94667a5d95d4716150fad284c16');
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+        background-size: cover;
+      }
+      li {
+        list-style-type: none;
+        float: left;
+        overflow: hidden;
+      }
+      
+      li a {
+        padding: 14px;
+        font-size: 19px;
+        text-decoration: none;
+        color: white;
+      }
+      
+      li a:hover {
+        background-color: grey;
+        color: white;
+      }    
+      footer {
+        position: fixed;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        background-color: #2d2e2d;
+        color: white;
+        text-align: center;
+        height: 50px;
+        }  
+    </style>   
+
+  </head>
+<body>
+  <nav class="navbar navbar-dark bg-dark">
+    <div class="container-fluid">
+    <ul class="nav nav-tabs mx-auto">
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'main:index' %}">Home</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link active" href="{% url 'main:upload-book' %}">Unos podataka</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'main:upload-publisher' %}">Unos izdavača</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'main:update-publisher' %}">Ažuriraj izdavača</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'main:delete-publisher' %}">Obriši izdavača</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link ml-4" href="{% url 'main:upload-author' %}">Unos autora</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'main:update-author' %}">Ažuriraj autora</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'main:delete-author' %}">Obriši autora</a>
+      </li>
+      
+      {% if not is_superuser %}
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'main:user' %}">Korisnička stranica</a>
+      </li>
+      {% endif %}
+
+      <li class="nav-item">
+        <a class="nav-link ml-4" href="{% url 'main:admin-page' %}">Svi korisnici (admin stranica)</a>
+      </li>
+      
+      <li class="nav-item">
+        <a class="nav-link " href="">Postavke</a>
+      </li>
+
+      {% if uid %}
+      <li class="nav-item">
+        <a class="nav-link" style="color: red;" href="{% url 'main:logout' %}">Log out</a>
+      </li>
+      {% else %}
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'main:login' %}">Log in</a>
+      </li>
+      {% endif %}
+    </ul>
+  </div>
+  </nav>    
+
+ <main class="page_margin">
+  {% if username %}
+  <h5>Korisnik: {{username}}</h5>
+ {% endif %}
+ 
+ <div class="d-flex justify-content-center">
+  <div class="shadow p-4 mb-5 bg-white rounded">
+ <form method="post">
+  <h3>Unos nove knjige</h3>
+  {% csrf_token %}
+  {{ form.as_p }}
+
+  {% if messages %}
+    {% for message in messages %}
+        {% if message.tags == 'success' %}
+            <div class="alert alert-success" role="alert">
+                {{ message }}
+            </div>
+        {% elif message.tags == 'error' %}
+            <div class="alert alert-danger" role="alert">
+                {{ message }}
+            </div>
+        {% endif %}
+    {% endfor %}
+  {% endif %}
+
+  <button type="submit" class="btn btn-primary">Add book</button>
+
+  </form>
+  </div>
+ </div>
+ </main>
+
+ <footer> 
+  <p>Završni rad 2023<br>
+  Autor: Marin Popović</p>
+ </footer>
+
+</body>
+</html>

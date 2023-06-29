@@ -7,12 +7,25 @@
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
 
+  <style>
+    .page_margin{
+      margin: 10px;
+     }
+     body {
+      background-image: url('https://img.freepik.com/free-vector/realistic-white-monochrome-background_23-2149003414.jpg?w=1380&t=st=1687868094~exp=1687868694~hmac=7cb387786a49f9ce93bb6bc4843543e48f66a94667a5d95d4716150fad284c16');
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+      background-size: cover;
+    }
+  </style>
+
   <body>
     <main>
       <div class="container">
-        <div class="row justify-content-center">
-            <div class="col-md-6">
-                <h1 class="text-center">Ispunite obrazac za registraciju admina</h1>
+        <div class="row justify-content-center align-items-center" style="height: 100vh;">
+         <div class="col-md-6">
+            <div class="shadow p-4 mb-5 bg-white rounded">
+                <h1 class="text-center">Ispunite obrazac za <br>registraciju admina</h1>
                 <form method="POST">
                     {% csrf_token %}
                     <div class="form-group">
@@ -36,6 +49,7 @@
                     <p>Već imate account? <a href="{% url 'main:login' %}">Sign in</a></p>
                     <a href="{% url 'main:index' %}">Povratak na početnu stranicu</a>
                 </form>
+             </div>
             </div>
         </div>
     </div>

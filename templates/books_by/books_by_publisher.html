@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  {% load static %}
     <meta charset="UTF-8">
     <title>Book by {{ publisher }}</title>
 </head>
@@ -12,9 +13,6 @@
     margin: 10px;
    }
 
-  table, th, td {
-      border:1px solid black;
-    }
   tr:hover {
       background-color: #e0e0e0;
     }
@@ -23,18 +21,48 @@
       list-style-type: none;
       float: left;
       overflow: hidden;
-       }
+      color: white;
+      }
   
   li a {
       padding: 14px;
       font-size: 19px;
       text-decoration: none;
+      color: white;
   }
   
   li a:hover {
-      background-color: #5FEDFA;
+      background-color: grey;
       color: white;
     }
+  .table-scroll {
+      border-radius: .5rem;
+    }
+    
+  .table-scroll table thead th {
+      font-size: 1.25rem;
+    }
+  .table-sortable th {
+      cursor: pointer;
+    }
+    
+  .table-sortable .th-sort-asc::after {
+      content: "\25b4";
+    }
+    
+  .table-sortable .th-sort-desc::after {
+      content: "\25be";
+    }
+  footer {
+      position: fixed;
+      left: 0;
+      bottom: 0;
+      width: 100%;
+      background-color: #2d2e2d;
+      color: white;
+      text-align: center;
+      height: 50px;
+      } 
     </style>
 <body>
 
@@ -42,14 +70,16 @@
     <div class="container-fluid">
     <ul class="nav nav-tabs mx-auto">
       <li class="nav-item">
-        <a class="nav-link active" href="{% url 'main:index' %}">Home</a>
+        <a class="nav-link" href="{% url 'main:index' %}">Home</a>
       </li>
 
+      {% if is_superuser %}
       <li class="nav-item">
-        <a class="nav-link" href="{% url 'main:unos' %}">Unos podataka</a>
+        <a class="nav-link" href="{% url 'main:upload-book' %}">Unos podataka</a>
       </li>
+      {% endif %}
       
-      {% if not is_superuser %}
+      {% if uid and not is_superuser %}
       <li class="nav-item">
         <a class="nav-link" href="{% url 'main:user' %}">Korisnička stranica</a>
       </li>
@@ -61,9 +91,10 @@
           <select class="form-control" name="search_type">
             <option value="title">Naziv knjige</option>
             <option value="author">Autor</option>
+            <option value="publisher">Izdavač</option>
           </select>
-          <input class="form-control mr-sm-2" type="search" placeholder="Pretraga" aria-label="Search" name="search_term">
-          <button class="btn btn-outline-success my-2 my-sm-0" type="submit">Pretraga</button>
+          <input class="form-control mr-sm-2" type="search" placeholder="Pretraga" aria-label="Search" name="search_term" id="search-term-input">
+          <button class="btn btn-outline-success my-2 my-sm-0" type="submit" id="search-button" disabled>Pretraga</button>
         </form>
       </li>
 
@@ -79,20 +110,17 @@
         </a>
         <div class="dropdown-menu" aria-labelledby="navbarDropdown">
          <a class="dropdown-item" href="{% url 'main:register' %}">Korisnik</a>
+         {% if is_superuser %}
          <a class="dropdown-item" href="{% url 'main:register_superuser' %}">Admin</a>
+         {% endif %}
         </div>
       </li> 
 
-      <li class="nav-item dropdown">
-        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-          Postavke (ne radi)
-        </a>
-        <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-         <a class="dropdown-item" href="">Pormjena korisničkog imena</a>
-         <a class="dropdown-item" href="">Pormjena email adrese imena</a>
-         <a class="dropdown-item" href="">Pormjena lozinke</a>
-        </div>
-      </li> 
+      {% if uid %}
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'main:settings-main' %}">Postavke</a>
+      </li>
+      {% endif %}
 
       {% if uid %}
       <li class="nav-item">
@@ -110,13 +138,14 @@
 <main class="page_margin">
   {% if username %}
   <h5>Korisnik: {{username}}</h5>
+  <hr>
  {% endif %}
- <hr>
- <br>
+
  <h3>Books published by {{ publisher }}</h3>
  <hr>
- <table class="table table-hover table-sortable">
-  <thead>
+ <div class="table-responsive table-scroll" data-mdb-perfect-scrollbar="true" style="position: relative; height: 700px">
+ <table class="table table-hover table-sortable table-striped">
+  <thead class="thead-dark">
     <tr>
       <th>ID</th>
       <th>Title</th>
@@ -141,7 +170,16 @@
     {% endfor %}
   </tbody>
  </table>
+</div>
 </main> 
+
+ <footer>
+  <p>Završni rad 2023<br>
+  Autor: Marin Popović</p>
+ </footer>
+
+ <script src="{% static 'search_bar_input.js' %}"></script>
+ <script src="{% static 'sort_table.js' %}"></script> 
 
   <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/popper.js@1.14.7/dist/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>

@@ -4,7 +4,6 @@
   {% load static %}
     <meta charset="UTF-8">
     <title>Pocetna stranica</title>
-    <link rel="stylesheet" type="text/css" href="{% static 'style.css' %}">
 </head>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
@@ -14,6 +13,10 @@
     margin: 10px;
    }
 
+  .sticky-header{
+    position:sticky;
+    top: 0 ;
+    } 
   li {
     list-style-type: none;
     float: left;
@@ -21,28 +24,67 @@
   
   li a {
     padding: 14px;
-    font-size: 17px;
+    font-size: 19px;
     text-decoration: none;
+    color: white;
   }
   
   li a:hover {
-    background-color: #5FEDFA;
+    background-color: grey;
     color: white;
   }    
+  td, th {
+    padding: 4px;
+  } 
+tr:hover {
+    background-color: #4d4a4a;
+  }
+
+.table-sortable th {
+    cursor: pointer;
+  }
+  
+.table-sortable .th-sort-asc::after {
+    content: "\25b4";
+  }
+  
+.table-sortable .th-sort-desc::after {
+    content: "\25be";
+  }
+
+.table-scroll {
+    border-radius: .5rem;
+  }
+  
+.table-scroll table thead th {
+    font-size: 1.25rem;
+  }
+  footer {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    background-color: #2d2e2d;
+    color: white;
+    text-align: center;
+    height: 50px;
+    } 
 </style>
 <body>
   <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
     <ul class="nav nav-tabs mx-auto">
       <li class="nav-item">
-        <a class="nav-link active" href="">Home</a>
+        <a class="nav-link active" href="{% url 'main:index' %}">Home</a>
       </li>
 
+      {% if is_superuser %}
       <li class="nav-item">
-        <a class="nav-link" href="{% url 'main:unos' %}">Unos podataka</a>
+        <a class="nav-link" href="{% url 'main:upload-book' %}">Unos podataka</a>
       </li>
+      {% endif %}
       
-      {% if not is_superuser %}
+      {% if uid and not is_superuser %}
       <li class="nav-item">
         <a class="nav-link" href="{% url 'main:user' %}">Korisnička stranica</a>
       </li>
@@ -54,9 +96,10 @@
           <select class="form-control" name="search_type">
             <option value="title">Naziv knjige</option>
             <option value="author">Autor</option>
+            <option value="publisher">Izdavač</option>
           </select>
-          <input class="form-control mr-sm-2" type="search" placeholder="Pretraga" aria-label="Search" name="search_term">
-          <button class="btn btn-outline-success my-2 my-sm-0" type="submit">Pretraga</button>
+          <input class="form-control mr-sm-2" type="search" placeholder="Pretraga" aria-label="Search" name="search_term" id="search-term-input">
+          <button class="btn btn-outline-success my-2 my-sm-0" type="submit" id="search-button" disabled>Pretraga</button>
         </form>
       </li>
 
@@ -72,20 +115,17 @@
         </a>
         <div class="dropdown-menu" aria-labelledby="navbarDropdown">
          <a class="dropdown-item" href="{% url 'main:register' %}">Korisnik</a>
+         {% if is_superuser %}
          <a class="dropdown-item" href="{% url 'main:register_superuser' %}">Admin</a>
+         {% endif %}
         </div>
       </li> 
 
-      <li class="nav-item dropdown">
-        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-          Postavke (ne radi)
-        </a>
-        <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-         <a class="dropdown-item" href="">Pormjena korisničkog imena</a>
-         <a class="dropdown-item" href="">Pormjena email adrese imena</a>
-         <a class="dropdown-item" href="">Pormjena lozinke</a>
-        </div>
-      </li> 
+      {% if uid %}
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'main:settings-main' %}">Postavke</a>
+      </li>
+      {% endif %}
 
       {% if uid %}
       <li class="nav-item">
@@ -103,21 +143,78 @@
 <main class="page_margin">
   {% if username %}
    <h5>Korisnik: {{username}}</h5>
+   <hr>
   {% endif %}
-  <hr>
-  <lable for="book_per_page"> Prikaz: 
-    <select name="books" id="book_per_page">
-      <option value="">--Odabir--</option>
-      <option value="10">10</option>
-      <option value="25">25</option>
-      <option value="50">50</option>
-    </select>
-    knjiga po stranici (trenutno ne radi)
-  </lable>
-  <br><br>
 
- <table class="table table-hover table-sortable">
-  <thead class="thead-light">
+  <!-- Pagination links -->
+  <!-- Django pagination link: https://docs.djangoproject.com/en/4.2/topics/pagination/ -->
+  <nav aria-label="Page navigation">
+    <ul class="pagination">
+      {% if books.has_previous %}
+        <li class="page-item">
+          <a class="page-link" style="font-size: 17px;" href="?page=1">&laquo; First</a>
+        </li>
+        <li class="page-item">
+          <a class="page-link" style="font-size: 17px;" href="?page={{ books.previous_page_number }}">Previous</a>
+        </li>
+      {% else %}
+        <li class="page-item disabled">
+          <span class="page-link" style="font-size: 17px;">&laquo; First</span>
+        </li>
+        <li class="page-item disabled">
+          <span class="page-link" style="font-size: 17px;">Previous</span>
+        </li>
+      {% endif %}
+  
+      {% if books.number > 2 %}
+        <li class="page-item">
+          <a class="page-link" style="font-size: 17px;" href="?page={{ books.number|add:'-2' }}">{{ books.number|add:'-2' }}</a>
+        </li>
+      {% endif %}
+  
+      {% if books.number > 1 %}
+        <li class="page-item">
+          <a class="page-link" style="font-size: 17px;" href="?page={{ books.number|add:'-1' }}">{{ books.number|add:'-1' }}</a>
+        </li>
+      {% endif %}
+  
+      <li class="page-item active">
+        <span class="page-link">{{ books.number }}</span>
+      </li>
+  
+      {% if books.number < books.paginator.num_pages %}
+        <li class="page-item">
+          <a class="page-link" style="font-size: 17px;" href="?page={{ books.number|add:'1' }}">{{ books.number|add:'1' }}</a>
+        </li>
+      {% endif %}
+  
+      {% if books.number < books.paginator.num_pages|add:'-1' %}
+        <li class="page-item">
+          <a class="page-link" style="font-size: 17px;" href="?page={{ books.number|add:'2' }}">{{ books.number|add:'2' }}</a>
+        </li>
+      {% endif %}
+  
+      {% if books.has_next %}
+        <li class="page-item">
+          <a class="page-link" style="font-size: 17px;" href="?page={{ books.next_page_number }}">Next</a>
+        </li>
+        <li class="page-item">
+          <a class="page-link" style="font-size: 17px;" href="?page={{ books.paginator.num_pages }}">Last &raquo;</a>
+        </li>
+      {% else %}
+        <li class="page-item disabled">
+          <span class="page-link" style="font-size: 17px;">Next</span>
+        </li>
+        <li class="page-item disabled">
+          <span class="page-link" style="font-size: 17px;">Last &raquo;</span>
+        </li>
+      {% endif %}
+    </ul>
+  </nav>
+  
+ <div class="table-responsive table-scroll" data-mdb-perfect-scrollbar="true" style="position: relative; height: 700px">
+ <table class="table table-hover table-sortable table-striped">
+  <thead class="thead-dark sticky-header">
     <tr>
       <th title="Shows the book ID number">ID</th>
       <th title="Shows the book title">Title</th>
@@ -135,22 +232,35 @@
       <td><a href="{% url 'main:book-show' book.ID %}" style="color: inherit;">{{ book.Title }}</a></td>
       <td><a href="{% url 'main:books-by-author' author=book.Author %}" style="color: inherit;">{{ book.Author }}</a></td>
 
-      {% if book.Publisher == "No publisher" %}
+      {% if book.Publisher == "No publisher" or book.Publisher == "NULL" %}
       <td>{{ book.Publisher }}</td>
       {% else %}
       <td><a href="{% url 'main:books-by-publisher' publisher=book.Publisher %}" style="color: inherit;">{{ book.Publisher }}</a></td>
       {% endif %}
       
-      <td>{{ book.Genre }}</td>
+      <td>
+        {% for genre in book.Genre %}
+        <a href="{% url 'main:books-by-genre' genre %}" style="color: inherit;">{{ genre }}</a>
+        {% if not forloop.last %}, {% endif %}
+      {% endfor %}
+      </td>
+
       <td>{{ book.Country }}</td>
       <td>{{ book.Year }}</td>
     </tr>
     {% endfor %}
   </tbody>
  </table>
- 
+</div>
 </main> 
+
+ <footer>
+  <p>Završni rad 2023<br>
+  Autor: Marin Popović</p>
+ </footer>
+
  <script src="{% static 'sort_table.js' %}"></script>
+ <script src="{% static 'search_bar_input.js' %}"></script>
 
   <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/popper.js@1.14.7/dist/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>

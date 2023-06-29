@@ -1,11 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    {% load static %}
     <meta charset="UTF-8">
-    <title>Ažuriranje knjige</title>
+    <title>Izbriši autora</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
-  </head>
 
     <style>
       .page_margin{
@@ -18,22 +16,24 @@
         background-size: cover;
       }
       li {
-          list-style-type: none;
-          float: left;
-        }
-      
-      li a {
-          padding: 14px;
-          font-size: 19px;
-          text-decoration: none;
-          color: white;
+        list-style-type: none;
+        float: left;
+        overflow: hidden;
+         }
+    
+    li a {
+        padding: 14px;
+        font-size: 19px;
+        text-decoration: none;
+        color: white;
+    }
+  
+    li a:hover {
+        background-color: grey;
+        color: white;
       }
-      
-      li a:hover {
-          background-color: grey;
-          color: white;
-        }
-      footer {
+  
+    footer {
         position: fixed;
         left: 0;
         bottom: 0;
@@ -42,9 +42,10 @@
         color: white;
         text-align: center;
         height: 50px;
-        }  
+        } 
     </style>   
 
+  </head>
 <body>
   <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
@@ -56,49 +57,44 @@
       <li class="nav-item">
         <a class="nav-link" href="{% url 'main:upload-book' %}">Unos podataka</a>
       </li>
+
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'main:upload-publisher' %}">Unos izdavača</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'main:update-publisher' %}">Ažuriraj izdavača</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'main:delete-publisher' %}">Obriši izdavača</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link ml-4" href="{% url 'main:upload-author' %}">Unos autora</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'main:update-author' %}">Ažuriraj autora</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link active" href="{% url 'main:delete-author' %}">Obriši autora</a>
+      </li>
       
-      {% if uid and not is_superuser %}
+      {% if not is_superuser %}
       <li class="nav-item">
         <a class="nav-link" href="{% url 'main:user' %}">Korisnička stranica</a>
       </li>
       {% endif %}
 
       <li class="nav-item">
-        <form class="form-inline my-2 my-lg-0 ml-4" method="GET" action="{% url 'main:book-search' %}">
-          {% csrf_token %}
-          <select class="form-control" name="search_type">
-            <option value="title">Naziv knjige</option>
-            <option value="author">Autor</option>
-            <option value="publisher">Izdavač</option>
-          </select>
-          <input class="form-control mr-sm-2" type="search" placeholder="Pretraga" aria-label="Search" name="search_term" id="search-term-input">
-          <button class="btn btn-outline-success my-2 my-sm-0" type="submit" id="search-button" disabled>Pretraga</button>
-        </form>
-      </li>
-
-      {% if is_superuser %}
-      <li class="nav-item">
         <a class="nav-link ml-4" href="{% url 'main:admin-page' %}">Svi korisnici (admin stranica)</a>
       </li>
-      {% endif %}
-
-      <li class="nav-item dropdown">
-        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-          Registracija
-        </a>
-        <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-         <a class="dropdown-item" href="{% url 'main:register' %}">Korisnik</a>
-         {% if is_superuser %}
-         <a class="dropdown-item" href="{% url 'main:register_superuser' %}">Admin</a>
-         {% endif %}
-        </div>
-      </li> 
-
-      {% if uid %}
+      
       <li class="nav-item">
-        <a class="nav-link" href="{% url 'main:settings-main' %}">Postavke</a>
+        <a class="nav-link " href="">Postavke</a>
       </li>
-      {% endif %}
 
       {% if uid %}
       <li class="nav-item">
@@ -118,28 +114,40 @@
   <h5>Korisnik: {{username}}</h5>
  {% endif %}
  <hr>
- <div class="d-flex justify-content-center">
+ <div class="row justify-content-center align-items-center" style="height: 50vh;">
   <div class="shadow p-4 mb-5 bg-white rounded">
-  <form method="post">
-    <h3>Azuriranje knjige</h3>
+ <form method="post">
+  <h3>Izbriši autora</h3>
     {% csrf_token %}
     {{ form.as_p }}
-    <input type="submit" class="btn btn-primary" value="Update">
-   </form>
+
+    {% if messages %}
+    {% for message in messages %}
+        {% if message.tags == 'success' %}
+            <div class="alert alert-success" role="alert">
+                {{ message }}
+            </div>
+        {% elif message.tags == 'error' %}
+            <div class="alert alert-danger" role="alert">
+                {{ message }}
+            </div>
+        {% endif %}
+    {% endfor %}
+  {% endif %}   
+
+  <button type="submit" class="btn btn-danger">Delete</button>
+  </form>
   </div>
  </div>
  </main>
 
- <footer>
+ <footer> 
   <p>Završni rad 2023<br>
   Autor: Marin Popović</p>
  </footer>
 
- <script src="{% static 'search_bar_input.js' %}"></script>
-
  <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
  <script src="https://cdn.jsdelivr.net/npm/popper.js@1.14.7/dist/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
  <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
-
 </body>
 </html>

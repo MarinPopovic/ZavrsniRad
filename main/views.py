@@ -1,10 +1,22 @@
 from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.http import HttpResponse
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.contrib import messages
+import datetime
+import os #upload image
 from .forms import *
 import pyrebase
+import firebase_admin
+from firebase_admin import credentials, auth
+import tempfile
 
 # Create your views here.
+
+# Initialize Firebase Admin SDK
+#This is used for updating the email adress in the Firebase's Authentication page
+cred = credentials.Certificate("./main/zavrsnirad-d6160-firebase-adminsdk-c68do-afe21305d5.json")
+firebase_admin.initialize_app(cred)
 
 config={
   "apiKey": "AIzaSyAb3kFcqaffBQLvmPrAYJ3bEJ6aGj2mv1I",
@@ -19,6 +31,7 @@ config={
 firebase=pyrebase.initialize_app(config)
 authe=firebase.auth()
 database=firebase.database()
+storage = firebase.storage()
 
 def index(request):
     # Get a list of keys in the Knjige node
@@ -29,15 +42,39 @@ def index(request):
     
     # Loop through the keys and retrieve the data from each attribute in 'Knjige'
     for key in keys:
-        book=database.child('Knjige').child(key).get().val()
+        book=database.child('Knjige').child(key).get().val()  
         
-        # Join the values in the 'Genre' array with a comma and space separator
-        book['Genre']=', '.join(book['Genre'])
+        # Retrieve the publisher data from the "Publishers" node
+        publisher_id = book.get('PublisherID')
+        publisher = database.child('Publishers').child(publisher_id).child('Publisher').get().val()
         
+        # Replace the "PublisherID" with the retrieved "Publisher" value
+        book['Publisher'] = publisher
+        
+        # Retrieve the author data from the "Authors" node
+        author_id = book.get('AuthorID')
+        author = database.child('Authors').child(author_id).child('Author').get().val()
+        
+        # Replace the "AuthorsID" with the retrieved "Authors" value
+        book['Author'] = author
+              
         books.append(book)
-        
+      
     # Sort the books by ID
     books.sort(key=lambda x: int(x['ID']))
+    
+    # Paginate the books list
+    paginator = Paginator(books, 50)  # 50 books per page
+    page = request.GET.get('page')
+
+    try:
+        books = paginator.page(page)
+    except PageNotAnInteger:
+        # If the page parameter is not an integer, show the first page
+        books = paginator.page(1)
+    except EmptyPage:
+        # If the page is out of range, show the last page
+        books = paginator.page(paginator.num_pages)
        
     # Get the user ID from the session variable
     uid = request.session.get('uid')
@@ -77,19 +114,20 @@ def register(request):
         
         # Check if the password and password confirmation match
         if password != password2:
-            error = "Polja za lozinku i potvrdu zaporke se ne podudaraju."
-            return render(request, 'user/register.html', {'error': error})
+            messages.error(request, "Polja za lozinku i potvrdu zaporke se ne podudaraju.")
+            return render(request, 'user/register.html')
 
         try:
             # Create the user using Firebase authentication
             user = authe.create_user_with_email_and_password(email, password)
             uid=user['localId']
-        except pyrebase.exceptions.EmailAlreadyExistsError:
-            error = "Email adresa već postoji."
-            return render(request, 'user/register.html', {'error': error})
-        except pyrebase.exceptions.RequestsConnectionError:
-            error = "Došlo je do pogreške prilikom registracije vašeg računa. Molimo pokušajte ponovno."
-            return render(request, 'user/register.html', {'error': error})
+        except:
+            # Check if the email already exists in the Users node
+            users = database.child("Users").get()
+            for user in users.each():
+                if user.val()["email"] == email:
+                    messages.error(request, "Email adresa već postoji.")
+                    return render(request, 'user/register.html')
         
         # Add the user data to the Firebase's database with an empty wishlist and borrowed list
         data = {"username": username, "email": email, "wishlist": ["Empty"], "borrowed": ["Empty"]}
@@ -110,19 +148,20 @@ def register_superuser(request):
         
         # Check if the password and password confirmation match
         if password != password2:
-            error = "Polja za lozinku i potvrdu zaporke se ne podudaraju."
-            return render(request, 'user/register.html', {'error': error})
+            messages.error(request, "Polja za lozinku i potvrdu zaporke se ne podudaraju.")
+            return render(request, 'user/register_superuser.html')
 
         try:
             # Create the user using Firebase authentication
             user = authe.create_user_with_email_and_password(email, password)
             uid=user['localId']
         except pyrebase.exceptions.EmailAlreadyExistsError:
-            error = "Email adresa već postoji."
-            return render(request, 'user/register_superuser.html', {'error': error})
-        except pyrebase.exceptions.RequestsConnectionError:
-            error = "Došlo je do pogreške prilikom registracije vašeg računa. Molimo pokušajte ponovno."
-            return render(request, 'user/register_superuser.html', {'error': error})
+            # Check if the email already exists in the Users node
+            users = database.child("Superusers").get()
+            for user in users.each():
+                if user.val()["email"] == email:
+                    messages.error(request, "Email adresa već postoji.")
+                    return render(request, 'user/register_superuser.html')
         
         # Add the superuser data to the Firebase's database
         superuser_data = {"username": username, "email": email}
@@ -139,12 +178,19 @@ def login(request):
     email = request.POST.get('email')
     password = request.POST.get('password')
     
+    # Check if the user's email exists in the "DeletedUsers" node
+    deleted_users = database.child('DeletedUsers').get()
+    for user in deleted_users.each():
+        if user.val() == email:
+            messages.error(request, 'Ovaj korisnik je obrisan.')
+            return render(request, 'user/login.html')
+    
     try:
         # Authenticate the user using Firebase authentication
         user = authe.sign_in_with_email_and_password(email, password)
     except:
-        error = "Netočna email adresa ili loznika. Molimo pokušajte ponovno."
-        return render(request, 'login.html', {'error': error})
+        messages.error(request, 'Netočna email adresa ili loznika. Molimo pokušajte ponovno.')
+        return render(request, 'user/login.html')
     
     # Save the user ID as a session variable
     request.session['uid'] = user['localId']
@@ -159,6 +205,177 @@ def logout(request):
     del request.session['uid']
 
     # Redirect to the login page after successful logout
+    return redirect('main:index')
+
+def settings_main_page(request):
+    uid = request.session.get('uid')
+    
+    is_superuser = database.child('Superusers').child(uid).get().val()
+    
+    if is_superuser:
+        user_data = database.child("Superusers").child(uid).get().val()
+    else:
+        user_data = database.child("Users").child(uid).get().val()
+    
+    username = user_data['username']
+    email = user_data['email']
+    
+    # Censor email
+    local_part, domain = email.split('@')
+    censored_email = local_part[0] + '***' + local_part[-1] + '@' + domain[0] + '***' + domain[-1]
+    
+    context = {'username': username, 'email': censored_email, 'uid': uid, 'is_superuser': is_superuser}
+    return render(request, 'settings/settings_main_page.html', context)
+
+def change_username(request):
+    if request.method == 'POST':
+        new_username = request.POST.get('new_username')
+        password = request.POST.get('password')
+        
+        # Get the user's UID from the session variable
+        uid = request.session.get('uid')
+        
+        try:
+            # Retrieve the user's email from the database
+            # Check if the user is a regular user or an admin (superuser) 
+            is_superuser = database.child('Superusers').child(uid).get().val()
+            if is_superuser:
+                user_data = database.child("Superusers").child(uid).get().val()
+            else:
+                user_data = database.child("Users").child(uid).get().val()   
+                    
+            email = user_data['email']
+            
+            # Re-authenticate the user using Firebase authentication
+            user = authe.sign_in_with_email_and_password(email, password)
+                     
+            if is_superuser:
+                user_type = 'Superusers'
+            else:
+                user_type = 'Users'
+            
+            # Update the username in the appropriate node in the Firebase's database
+            database.child(user_type).child(uid).update({"username": new_username})
+            
+            # Redirect to the settings page with a success message
+            messages.success(request, 'Korisničko ime je uspješno promijenjeno.')
+            return render(request, 'settings/change_username.html', {'uid': uid, 'is_superuser': is_superuser})
+        
+        except:
+            messages.error(request, 'Pogrešna lozinka ili greška prilikom promjene korisničkog imena. Molim te pokušaj ponovno.')
+            return render(request, 'settings/change_username.html', {'uid': uid, 'is_superuser': is_superuser})
+
+    else:
+        uid = request.session.get('uid')
+        if uid:
+         # Check if the logged-in user is a superuser
+         is_superuser = database.child('Superusers').child(uid).get().val()
+        return render(request, 'settings/change_username.html', {'uid': uid, 'is_superuser': is_superuser})
+
+def change_email(request):
+    if request.method == 'POST':
+        new_email = request.POST.get('new_email')
+        password = request.POST.get('password')
+        
+        # Get the user's UID from the session variable
+        uid = request.session.get('uid')
+        
+        try:
+            # Retrieve the user's email from the database
+            # Check if the user is a regular user or an admin (superuser) 
+            is_superuser = database.child('Superusers').child(uid).get().val()
+            if is_superuser:
+                user_data = database.child("Superusers").child(uid).get().val()
+            else:
+                user_data = database.child("Users").child(uid).get().val() 
+                
+            email = user_data['email']
+            
+            # Re-authenticate the user using Firebase authentication
+            user = authe.sign_in_with_email_and_password(email, password)
+        
+            if is_superuser:
+                user_type = 'Superusers'
+            else:
+                user_type = 'Users'
+                
+            # Update the email in the Firebase's database
+            database.child(user_type).child(uid).update({"email": new_email})
+            
+            # Update the email in Firebase Authentication
+            user = auth.update_user(uid, email=new_email)
+            
+            # Redirect to the settings page with a success message
+            messages.success(request, 'Email je uspješno promijenjen.')
+            return render(request, 'settings/change_email.html', {'uid': uid, 'is_superuser': is_superuser})
+        except:
+            messages.error(request,"Pogrešna lozinka ili greška prilikom promjene emaila. Molimo pokušajte ponovno.")
+            return render(request, 'settings/change_email.html', {'uid': uid, 'is_superuser': is_superuser})      
+
+    else:
+        uid = request.session.get('uid')
+        if uid:
+         # Check if the logged-in user is a superuser
+         is_superuser = database.child('Superusers').child(uid).get().val()
+        return render(request, 'settings/change_email.html', {'uid': uid, 'is_superuser': is_superuser})
+
+def change_password(request):
+    if request.method == 'POST':
+        current_password = request.POST.get('current_password')
+        new_password = request.POST.get('new_password')
+        
+        # Get the user's UID from the session variable
+        uid = request.session.get('uid')
+        
+        try:
+            # Retrieve the user's email from the database
+            # Check if the user is a regular user or an admin (superuser) 
+            is_superuser = database.child('Superusers').child(uid).get().val()
+            if is_superuser:
+                user_data = database.child("Superusers").child(uid).get().val()
+            else:
+                user_data = database.child("Users").child(uid).get().val() 
+                
+            email = user_data['email']
+            
+            # Re-authenticate the user using Firebase authentication
+            user = authe.sign_in_with_email_and_password(email, current_password)
+            
+            # Update the password in Firebase Authentication
+            auth.update_user(uid, password=new_password)
+            
+            # Redirect to the settings page with a success message
+            messages.success(request, "Lozinka je uspješno promijenjena.") 
+            return render(request, 'settings/change_password.html', {'uid': uid, 'is_superuser': is_superuser})
+        
+        except:
+            messages.error(request, "Pogrešna trenutna lozinka ili greška tijekom promjene lozinke. Molimo pokušajte ponovno.")
+            return render(request, 'settings/change_password.html', {'uid': uid, 'is_superuser': is_superuser})
+    
+    else:
+        uid = request.session.get('uid')
+        if uid:
+         # Check if the logged-in user is a superuser
+         is_superuser = database.child('Superusers').child(uid).get().val()
+        return render(request, 'settings/change_password.html', {'uid': uid, 'is_superuser': is_superuser})
+
+def delete_account(request):
+    uid = request.session.get('uid')
+    
+    try:
+        # Delete the user's account from Firebase Authentication
+        auth.delete_user(uid)
+    except:
+        # Handle any errors that occur during account deletion
+        error = "An error occurred while deleting your account. Please try again."
+        return render(request, 'settings/settings_main_page.html', {'error': error})
+    
+    # Remove the user data from the Firebase Realtime Database
+    database.child("Users").child(uid).remove()
+    
+    # Clear the user ID from the session
+    del request.session['uid']
+       
     return redirect('main:index')
 
 def admin_page(request):
@@ -182,35 +399,64 @@ def admin_page(request):
         username = user.val()['username']
         user_data.append({"uid": uid, "email": email, "username": username})
         
-    context = {'user_data': user_data, 'is_superuser': is_superuser, 'uid': uid}
+    approve_data = database.child("Approve_book_return").get()
+
+    # Empty list to store data from "Approve_book_return"
+    approve_list = []
+    
+    # Loop through the approve data and get book_id and user_email for each item
+    for approve in approve_data.each():
+       if approve.val() is None:
+        continue 
+        
+       book_id = approve.val()['book_id']
+       user_email = approve.val()['user_email']
+       date_requested_return = approve.val()['date_requested_return']
+       
+       if book_id == -1:
+          continue
+      
+       book_data = database.child('Knjige').child(book_id).get().val()
+       book_title = book_data.get('Title')
+       
+       approve_list.append({"book_id": book_id, "user_email": user_email,
+                            "date_requested_return": date_requested_return, "random_string": approve.key(),
+                            "book_title": book_title})
+        
+    context = {'user_data': user_data, 'is_superuser': is_superuser, 'uid': uid, 'approve_list': approve_list}
     return render(request, 'admin_page.html', context)
 
-def delete_account(request):
+def approve_book_return(request, random_string):    
+    database.child('Approve_book_return').child(random_string).remove()
+    return redirect('main:admin-page')
+    
+def delete_user_account(request, uid):
     if request.method == 'POST':
-        # Get the UID of the user to be deleted from the POST request
-        uid = request.POST['uid']
+        # Get the email of the user to be deleted
+        user_email = database.child('Users').child(uid).child('email').get().val()
         
-        try:
-            # Delete the user data from the Firebase database
-            database.child("Users").child(uid).remove()
-            
-            # Redirect to the admin page with a success message
-            messages.success(request, 'Korisnički račun je uspješno izbrisan.')
-            return redirect('main:admin-page')
+        # Store the email in the 'DeletedUsers' node
+        database.child('DeletedUsers').push(user_email)
+
+        # Delete the user from the 'Users' node
+        database.child('Users').child(uid).remove()
         
-        except:
-            # Redirect to the admin page with an error message if there is an error deleting the user
-            messages.error(request, 'Greška pri brisanju korisničkog računa.')
-            return redirect('main:admin-page')
+    return redirect('main:admin-page')
 
 def user_page(request):
     # Get the user's uid from the session
     uid = request.session.get('uid')
     
+    is_superuser = database.child('Superusers').child(uid).get().val()
+
+    if is_superuser:
+        return HttpResponse(status=403)
+    
     # Retrieve the user data from the Firebase's database
     user_data = database.child('Users').child(uid).get().val()
     
     username = user_data.get('username')
+    user_email = user_data.get('email')
 
     # Retrieve the wishlist of the user
     wishlist = user_data.get('wishlist', [])
@@ -241,16 +487,64 @@ def user_page(request):
     for book_id in borrowed_list:
         book_data = database.child('Knjige').child(book_id).get().val()
         books_2.append(book_data)
+        
+    # Retrieve the data for the books awaiting return approval
+    approve_data = database.child("Approve_book_return").get()
+    approve_list = []
+    for approve in approve_data.each():
+        if approve.val() is None:
+            continue
 
-    context = {'uid': uid, 'username': username, 'books': books, 'books_2': books_2, 'wishlist_empty': wishlist_empty, 
-               'borrowed_list_empty':borrowed_list_empty}
+        book_id = approve.val().get('book_id')
+        current_user = approve.val().get('user_email')
+
+        if book_id == -1:
+            continue
+
+        book_data = database.child('Knjige').child(book_id).get().val()
+        book_title = book_data.get('Title')
+        
+        if current_user == user_email:
+         approve_list.append({
+            "book_id": book_id,
+            "book_title": book_title,
+            "user_email": current_user,
+            "random_string": approve.key(),       
+         })
+
+    context = {'uid': uid, 'username': username, 'books': books, 'books_2': books_2, 
+               'wishlist_empty': wishlist_empty, 'borrowed_list_empty':borrowed_list_empty, 
+               'approve_list': approve_list, 'is_superuser': is_superuser}
     return render(request, 'user/user_page.html', context)
   
 def book_show(request, knjiga_id):   
     # Retrieve the data for the specified book
     book=database.child('Knjige').child(knjiga_id).get().val()
     
+    # Retrieve the publisher ID from the book data
+    publisher_id = book.get('PublisherID')
+    
+    # Retrieve the publisher data from the "Publishers" node
+    publisher_data = database.child('Publishers').child(publisher_id).get().val()
+
+    # Extract the publisher name from the fetched data
+    publisher_name = publisher_data.get('Publisher')
+
+    # Update the book dictionary with the publisher name
+    book['Publisher'] = publisher_name
+    
+    author_id = book.get('AuthorID')
+    author_data = database.child('Authors').child(author_id).get().val()
+    author_name = author_data.get('Author')
+    book['Author'] = author_name
+    
     book['Genre'] = ', '.join(book['Genre'])
+    
+    # Retrieve the image path of the author from the "Authors" node
+    image_path = author_data.get('Image')
+    
+    # Get the download URL for the author image from Firebase Storage
+    image_url = storage.child(image_path).get_url(None)
     
     uid = request.session.get('uid')
 
@@ -263,7 +557,8 @@ def book_show(request, knjiga_id):
          superuser_data = database.child('Superusers').child(uid).get().val() 
         
          username = superuser_data.get('username')
-         context = {"book": book, "knjiga_id": knjiga_id, "is_superuser":is_superuser, "username": username, "uid": uid}
+         context = {"book": book, "knjiga_id": knjiga_id, "is_superuser":is_superuser, "username": username, 
+                    "uid": uid, "image_url": image_url}
          return render(request, 'book_show.html', context)
      
        else: 
@@ -277,16 +572,70 @@ def book_show(request, knjiga_id):
          # Check if the book is in the user's borrowed list
          borrowed_list = user_data.get('borrowed', [])
          is_borrowed = knjiga_id in borrowed_list
+
+         # Check if the user has reached the maximum borrowing limit
+         is_max_limit_reached = len(borrowed_list) >= 5
     
          username = user_data.get('username')
-         context = {"book": book, "knjiga_id": knjiga_id, "username": username, "uid": uid, "is_on_wishlist": is_on_wishlist, "is_borrowed": is_borrowed}
+         context = {"book": book, "knjiga_id": knjiga_id, "username": username, "uid": uid, "is_on_wishlist": is_on_wishlist, 
+                    "is_borrowed": is_borrowed, "is_max_limit_reached": is_max_limit_reached, "image_url": image_url}
          return render(request, 'book_show.html', context)
     else:
-       context = {"book": book, "knjiga_id": knjiga_id} 
+       context = {"book": book, "knjiga_id": knjiga_id, "image_url": image_url} 
        return render(request, 'book_show.html', context)
 
 def upload(request):
-    
+    uid = request.session.get('uid')
+
+    is_superuser = database.child('Superusers').child(uid).get().val()
+
+    if not is_superuser:
+        return HttpResponse(status=403)
+
+    username = is_superuser.get('username')
+
+    publishers = database.child('Publishers').get().val()  # Retrieve all publishers from the database
+    authors = database.child('Authors').get().val()  # Retrieve all authors from the database
+
+    if request.method == 'POST':
+        form = BookForm(request.POST, publishers=publishers, authors=authors)
+        if form.is_valid():
+            data = {
+                'Title': form.cleaned_data['Title'],
+                'AuthorID': form.cleaned_data['Author'],
+                'PublisherID': form.cleaned_data['Publisher'],
+                'Genre': form.cleaned_data['Genre'].split(', '),
+                'Country': form.cleaned_data['Country'],
+                'Print_length': form.cleaned_data['Print_length'],
+                'Year': form.cleaned_data['Year'],
+                'Quantity': form.cleaned_data['Quantity'],
+                'Description': form.cleaned_data['Description'],
+            }
+            
+            # Assign "NULL" to fields that are not required
+            if data['Country'] == '':
+                data['Country'] = 'NULL'
+            if data['Year'] is None:
+                data['Year'] = 'NULL'
+            if data['Description'] == '':
+                data['Description'] = 'NULL'
+            
+            books_count = database.child('Knjige').get().each()
+            next_id = len(books_count) if books_count else 0
+            data['ID'] = next_id
+            
+            database.child('Knjige').child(str(next_id)).set(data)
+            messages.success(request, 'Upload successful.')
+            return redirect('main:upload-book')
+        else:
+            messages.error(request, 'Upload unsuccessful.')
+    else:
+        form = BookForm(publishers=publishers, authors=authors)
+
+    context = {'form': form, 'username': username, 'uid': uid, 'is_superuser': is_superuser}
+    return render(request, 'upload/upload_book.html', context)
+
+def upload_publisher(request):
     uid = request.session.get('uid')
     
     is_superuser = database.child('Superusers').child(uid).get().val()
@@ -297,27 +646,261 @@ def upload(request):
     username = is_superuser.get('username')
     
     if request.method == 'POST':
-        form = BookForm(request.POST)
-        if form.is_valid():
-            data = {
-                'ID': form.cleaned_data['ID'],
-                'Title': form.cleaned_data['Title'],
-                'Author': form.cleaned_data['Author'],
-                'Publisher': form.cleaned_data['Publisher'] if not form.cleaned_data['No_publisher'] else "No publisher",
-                'Genre': form.cleaned_data['Genre'].split(', '),
-                'Country': form.cleaned_data['Country'],
-                'Print length': form.cleaned_data['Print_length'],
-                'Year': form.cleaned_data['Year'],
-                'Kolicina': form.cleaned_data['Kolicina'],
-                'Description': form.cleaned_data['Description'],
+        form = PublisherForm(request.POST)
+        if form.is_valid():            
+            publisher_data = {             
+                #'PublisherID': form.cleaned_data['PublisherID'],
+                'Publisher': form.cleaned_data['Publisher'],
             }
-            database.child('Knjige').child(str(data['ID'])).set(data)
-            return redirect('main:index')
+            
+            publisher_count = database.child('Publishers').get().each()
+            next_id = len(publisher_count) if publisher_count else 0
+            publisher_data['PublisherID'] = next_id
+            
+            database.child('Publishers').child(str(next_id)).set(publisher_data)
+            
+            messages.success(request, 'Upload successful.')
+            
+            return redirect('main:upload-publisher')
+        else:
+            messages.error(request, 'Error. Upload was not successful.')
     else:
-        form = BookForm()
+        form = PublisherForm()
     
     context = {'form': form, 'username': username, 'uid': uid, 'is_superuser': is_superuser}
-    return render(request, 'unos.html', context)
+    return render(request, 'upload/upload_publisher.html', context)
+
+def upload_author(request):
+    uid = request.session.get('uid')
+    
+    is_superuser = database.child('Superusers').child(uid).get().val()
+    
+    if not is_superuser:
+        return HttpResponse(status=403)
+    
+    username = is_superuser.get('username')
+    
+    if request.method == 'POST':
+        form = AuthorForm(request.POST, request.FILES)
+        if form.is_valid():
+            author_data = {             
+                'Author': form.cleaned_data['Author'],
+            }
+            image = request.FILES['Image']
+            
+            image_path = f"authors/{image.name}" #Get image path
+            
+            author_count = database.child('Authors').get().each()
+            next_id = len(author_count) if author_count else 0
+            author_data['AuthorID'] = next_id
+            
+            # Upload image to storage
+            try:
+                storage.child(image_path).put(image)
+                messages.success(request, "Upload successful")
+            except:
+                messages.error(request, "Upload unsuccessful")
+                return redirect(reverse('upload-author'))
+            
+            # Update author data with image path
+            author_data['Image'] = image_path
+            
+            # Store author data in the database
+            database.child('Authors').child(str(next_id)).set(author_data)
+        else:
+            messages.error(request, "Form is invalid")
+    else:
+        form = AuthorForm()
+    
+    context = {'form': form, 'username': username, 'uid': uid, 'is_superuser': is_superuser}
+    return render(request, 'upload/upload_author.html', context)
+
+def update_publisher(request):
+    uid = request.session.get('uid')
+    is_superuser = database.child('Superusers').child(uid).get().val()
+
+    if not is_superuser:
+        return HttpResponse(status=403)
+
+    username = is_superuser.get('username')
+
+    publishers = database.child('Publishers').get().val()
+
+    if request.method == 'POST':
+        form = UpdatePublisherForm(request.POST, publishers=publishers)
+        if form.is_valid():
+            publisher_id = form.cleaned_data['Publisher']
+            new_publisher_name = form.cleaned_data['NewPublisherName']
+
+            # Update the publisher data
+            publisher_data = {
+                'Publisher': new_publisher_name,
+            }
+            database.child('Publishers').child(str(publisher_id)).update(publisher_data)
+
+            messages.success(request, 'Ažuriranje je uspijelo.')
+
+            # Redirect to the current page
+            return redirect(request.path)
+        else:
+            # Add an error message
+            messages.error(request, 'Greška! Ažuriranje nije uspijelo')
+    else:
+        form = UpdatePublisherForm(publishers=publishers)
+
+    context = {'form': form, 'publishers': publishers, 'username': username, 'uid': uid, 'is_superuser': is_superuser}
+    return render(request, 'update/update_publisher.html', context)
+
+def update_author(request):
+    uid = request.session.get('uid')
+    is_superuser = database.child('Superusers').child(uid).get().val()
+
+    if not is_superuser:
+        return HttpResponse(status=403)
+
+    username = is_superuser.get('username')
+
+    authors = database.child('Authors').get().val()
+
+    if request.method == 'POST':
+        form = UpdateAuthorForm(request.POST, request.FILES, authors=authors)
+        if form.is_valid():
+            author_id = form.cleaned_data['Author']
+            new_author_name = form.cleaned_data['NewAuthorName']
+            new_image = form.cleaned_data['Image']
+            
+            # Update the author data
+            author_data = {
+                'Author': new_author_name,
+            }
+            
+            # Check if a new image is uploaded
+            if new_image:
+                # Generate a temporary file to store the new image
+                with tempfile.NamedTemporaryFile(delete=True) as temp_image:
+                    temp_image.write(new_image.read())
+                    temp_image.flush()
+                    
+                    # Upload the new image to storage
+                    image_path = f"authors/{new_image.name}"
+                    try:
+                        storage.child(image_path).put(temp_image.name)
+                        messages.success(request, "Ažuriranje slike je uspijelo")
+                    except:
+                        messages.error(request, "Ažuriranje slike nije uspijelo")
+                        return redirect(reverse('update-author'))
+                    
+                    # Update the author's image path
+                    author_data['Image'] = image_path
+
+            database.child('Authors').child(str(author_id)).update(author_data)
+
+            messages.success(request, 'Ažuriranje je uspijelo.')
+
+            # Redirect to the current page
+            return redirect(request.path)
+        else:
+            # Add an error message
+            messages.error(request, 'Greška! Ažuriranje nije uspijelo.')
+    else:
+        form = UpdateAuthorForm(authors=authors)
+
+    context = {'form': form, 'authors': authors, 'username': username, 'uid': uid, 'is_superuser': is_superuser}
+    return render(request, 'update/update_author.html', context)
+
+def delete_publisher(request):
+    uid = request.session.get('uid')
+    is_superuser = database.child('Superusers').child(uid).get().val()
+
+    if not is_superuser:
+        return HttpResponse(status=403)
+
+    username = is_superuser.get('username')
+
+    #publishers = database.child('Publishers').get().val()
+
+    if request.method == 'POST':
+        form = DeletePublisherForm(request.POST)
+        if form.is_valid():
+            publisher_id = form.cleaned_data['PublisherID']
+
+            # Check if the publisher exists
+            publisher_exists = database.child('Publishers').child(str(publisher_id)).get().val()
+
+            if publisher_exists:
+                # Delete the publisher
+                database.child('Publishers').child(str(publisher_id)).remove()
+
+                # Update the books assigned to the deleted publisher
+                books = database.child('Knjige').get().each()  # Retrieve books as a list
+
+                for book in books:
+                    book_key = book.key()
+                    book_value = book.val()
+
+                    if book_value.get('PublisherID') == publisher_id:
+                        # Update the PublisherID value to 2 for books assigned to the deleted publisher
+                        database.child('Knjige').child(book_key).update({'PublisherID': 2})
+
+                messages.success(request, 'Objekt uspješno obrisan.')
+            else:
+                messages.error(request, 'Greška! Izdavač ne postoji.')
+
+            return redirect(request.path)
+        else:
+            messages.error(request, 'Greška! Objekt nije obrisan.')
+    else:
+        form = DeletePublisherForm()
+
+    context = {'form': form, 'username': username, 'uid': uid, 'is_superuser': is_superuser}
+    return render(request, 'delete/delete_publisher.html', context)
+
+def delete_author(request):
+    uid = request.session.get('uid')
+    is_superuser = database.child('Superusers').child(uid).get().val()
+
+    if not is_superuser:
+        return HttpResponse(status=403)
+
+    username = is_superuser.get('username')
+
+    #publishers = database.child('Publishers').get().val()
+
+    if request.method == 'POST':
+        form = DeleteAuthor(request.POST)
+        if form.is_valid():
+            author_id = form.cleaned_data['AuthorID']
+
+            # Check if the publisher exists
+            author_exists = database.child('Authors').child(str(author_id)).get().val()
+
+            if author_exists:
+                # Delete the publisher
+                database.child('Authors').child(str(author_id)).remove()
+
+                # Update the books assigned to the deleted author
+                books = database.child('Knjige').get().each()  # Retrieve books as a list
+
+                for book in books:
+                    book_key = book.key()
+                    book_value = book.val()
+
+                    if book_value.get('AuthorID') == author_id:
+                        # Update the AuthorID value to 2 for books assigned to the deleted author
+                        database.child('Knjige').child(book_key).update({'AuthorID': 2})
+
+                messages.success(request, 'Objekt uspješno obrisan.')
+            else:
+                messages.error(request, 'Greška! Autor ne postoji.')
+
+            return redirect(request.path)
+        else:
+            messages.error(request, 'Greška! Objekt nije obrisan.')
+    else:
+        form = DeleteAuthor()
+
+    context = {'form': form, 'username': username, 'uid': uid, 'is_superuser': is_superuser}
+    return render(request, 'delete/delete_author.html', context)
 
 def update_book(request, knjiga_id):
     
@@ -429,6 +1012,10 @@ def borrow_book(request, knjiga_id):
     if borrowed_books == ['Empty']:
         database.child('Users').child(uid).child('borrowed').remove()
         borrowed_books = []
+        
+    # Check if the user has already borrowed the maximum number of books
+    if len(borrowed_books) >= 5:
+        return redirect('main:user')
 
     # Check if the book is already borrowed by the user
     if knjiga_id in borrowed_books:
@@ -439,10 +1026,10 @@ def borrow_book(request, knjiga_id):
     book = database.child('Knjige').child(knjiga_id).get().val()
 
     # Decrease the quantity of the book by 1
-    quantity = book.get('Kolicina')
+    quantity = book.get('Quantity')
     if quantity > 0:
         quantity -= 1
-        database.child('Knjige').child(knjiga_id).child('Kolicina').set(quantity)
+        database.child('Knjige').child(knjiga_id).child('Quantity').set(quantity)
     else:
         # Book not available for borrowing
         return redirect('main:user')
@@ -478,9 +1065,9 @@ def return_book(request):
             borrowed_books.remove(book_id)
             
             book = database.child('Knjige').child(book_id).get().val()
-            quantity = book.get('Kolicina')
+            quantity = book.get('Quantity')
             quantity += 1
-            database.child('Knjige').child(book_id).child('Kolicina').set(quantity)
+            database.child('Knjige').child(book_id).child('Quantity').set(quantity)
         
         # Check if the borrowed list is now empty
         if not borrowed_books:
@@ -489,6 +1076,11 @@ def return_book(request):
         
         # Update the borrowed list in the Firebase's database   
         database.child('Users').child(uid).child('borrowed').set(borrowed_books)
+        
+        # Add the book ID and user email to the "Approve_book_return" node
+        approve_data = {'book_id': book_id, 'user_email': user_data['email'], 
+                        'date_requested_return': datetime.datetime.now().strftime('%d-%m-%Y')}
+        database.child('Approve_book_return').push(approve_data)
         
         # Redirect to the user page
         return redirect('main:user')
@@ -504,10 +1096,31 @@ def book_search(request):
         keys = database.child('Knjige').shallow().get().val()
         for key in keys:
             book = database.child('Knjige').child(key).get().val()
+            
+            # Retrieve the publisher ID from the book node
+            publisher_id = book.get('PublisherID')
+        
+            # Retrieve the publisher data from the "Publishers" node using the publisher ID
+            publisher_data = database.child('Publishers').child(publisher_id).get().val()
+        
+            # Get the "Publisher" attribute from the publisher data
+            publisher_name = publisher_data.get('Publisher')
+        
+            # Replace the "PublisherID" with the retrieved "Publisher" value
+            book['Publisher'] = publisher_name
+            
+            author_id = book.get('AuthorID')
+            author_data = database.child('Authors').child(author_id).get().val()
+            author_name = author_data.get('Author')
+            book['Author'] = author_name
+            
             if search_type == 'title' and search_term.lower() in book['Title'].lower():
                 book['Genre'] = ', '.join(book['Genre'])
                 books.append(book)
             elif search_type == 'author' and search_term.lower() in book['Author'].lower():
+                book['Genre'] = ', '.join(book['Genre'])
+                books.append(book)
+            elif search_type == 'publisher' and search_term.lower() in book['Publisher'].lower():
                 book['Genre'] = ', '.join(book['Genre'])
                 books.append(book)
         books.sort(key=lambda x: int(x['ID']))
@@ -519,6 +1132,10 @@ def book_search(request):
             url = reverse('main:book-author-search') + '?author=' + search_term
             context = {'books': books, 'search_term': search_term, 'uid': uid, 'url': url, 'is_superuser': is_superuser}
             return render(request, 'search/book_author_search.html', context)
+        elif search_type == 'publisher':
+            url = reverse('main:book-publisher-search') + '?publisher=' + search_term
+            context = {'books': books, 'search_term': search_term, 'uid': uid, 'url': url, 'is_superuser': is_superuser}
+            return render(request, 'search/book_publisher_search.html', context)
     else:
         return render(request, 'search/book_search.html')
     
@@ -535,6 +1152,22 @@ def book_author_search(request):
         books.sort(key=lambda x: int(x['ID']))
         return render(request, 'search/book_search.html', {'books': books, 'search_term': search_term})
     else:
+        return render(request, 'search/book_search.html')
+    
+def book_publisher_search(request):
+    if request.method == 'POST':
+        search_term = request.POST['search_book']
+        books = []
+        keys = database.child('Knjige').shallow().get().val()
+        for key in keys:
+            book = database.child('Knjige').child(key).get().val()
+            if search_term.lower() in book['Publisher'].lower():
+                book['Genre'] = ', '.join(book['Genre'])
+                books.append(book)
+        books.sort(key=lambda x: int(x['ID']))
+        uid = request.session.get('uid')
+        return render(request, 'search/book_search.html', {'books': books, 'search_term': search_term, 'uid': uid})
+    else:
         return render(request, 'book_search.html')
 
 def books_by_author(request, author):
@@ -547,6 +1180,23 @@ def books_by_author(request, author):
         book = database.child('Knjige').child(key).get().val()
         
         book['Genre']=', '.join(book['Genre'])
+        
+        # Retrieve the publisher ID from the book node
+        publisher_id = book.get('PublisherID')
+        
+        # Retrieve the publisher data from the "Publishers" node using the publisher ID
+        publisher_data = database.child('Publishers').child(publisher_id).get().val()
+        
+        # Get the "Publisher" attribute from the publisher data
+        publisher_name = publisher_data.get('Publisher')
+        
+        # Replace the "PublisherID" with the retrieved "Publisher" value
+        book['Publisher'] = publisher_name
+        
+        author_id = book.get('AuthorID')
+        author_data = database.child('Authors').child(author_id).get().val()
+        author_name = author_data.get('Author')
+        book['Author'] = author_name
         
         # Check if the book is written by the author
         if book['Author'] == author:
@@ -586,13 +1236,30 @@ def books_by_publisher(request, publisher):
     
     # Loop through the keys and retrieve the data from each node
     for key in keys:
-        book=database.child('Knjige').child(key).get().val()
+        book = database.child('Knjige').child(key).get().val()
         
         # Join the values in the 'Genre' array with a comma and space separator
-        book['Genre']=', '.join(book['Genre'])
+        book['Genre'] = ', '.join(book['Genre'])
+        
+        # Retrieve the publisher ID from the book node
+        publisher_id = book.get('PublisherID')
+        
+        # Retrieve the publisher data from the "Publishers" node using the publisher ID
+        publisher_data = database.child('Publishers').child(publisher_id).get().val()
+        
+        # Get the "Publisher" attribute from the publisher data
+        publisher_name = publisher_data.get('Publisher')
+        
+        # Replace the "PublisherID" with the retrieved "Publisher" value
+        book['Publisher'] = publisher_name
+        
+        author_id = book.get('AuthorID')
+        author_data = database.child('Authors').child(author_id).get().val()
+        author_name = author_data.get('Author')
+        book['Author'] = author_name
         
         # Check if the book's publisher matches the selected publisher
-        if book['Publisher'] == publisher:
+        if publisher_name == publisher:
             books.append(book)
         
     # Sort the books list by ID
@@ -616,22 +1283,59 @@ def books_by_publisher(request, publisher):
          user_data = database.child('Users').child(uid).get().val()
          username = user_data.get('username')
          context = {'publisher': publisher, 'books': books, 'uid': uid, 'username' :username}
-         return render(request, 'books_by/books_by_author.html', context)
+         return render(request, 'books_by/books_by_publisher.html', context)
     else:
         context = {'publisher': publisher, 'books': books}
-        return render(request, 'books_by/books_by_author.html', context)
+        return render(request, 'books_by/books_by_publisher.html', context)
     
 def books_by_genre(request, genre):
-    # Query the database for all books that contain the given genre
+    # Query the Firebase database to retrieve all books with the specified genre
     books = []
     keys = database.child('Knjige').shallow().get().val()
     for key in keys:
         book = database.child('Knjige').child(key).get().val()
+        
+        # Retrieve the publisher ID from the book node
+        publisher_id = book.get('PublisherID')
+        
+        # Retrieve the publisher data from the "Publishers" node using the publisher ID
+        publisher_data = database.child('Publishers').child(publisher_id).get().val()
+        
+        # Get the "Publisher" attribute from the publisher data
+        publisher_name = publisher_data.get('Publisher')
+        
+        # Replace the "PublisherID" with the retrieved "Publisher" value
+        book['Publisher'] = publisher_name
+        
+        author_id = book.get('AuthorID')
+        author_data = database.child('Authors').child(author_id).get().val()
+        author_name = author_data.get('Author')
+        book['Author'] = author_name
+        
         if genre in book['Genre']:
-            book['Genre'] = ', '.join(book['Genre'])
             books.append(book)
-    
+            
     # Sort the books list by ID
     books.sort(key=lambda x: int(x['ID']))
     
-    return render(request, 'books_by/books_by_genre.html', {'genre': genre, 'books': books})
+    uid = request.session.get('uid')
+    if uid:
+       # Check if the logged-in user is a superuser
+       is_superuser = database.child('Superusers').child(uid).get().val()
+       
+       if is_superuser:
+         # Retrieve the superuser data from the Firebase's database
+         superuser_data = database.child('Superusers').child(uid).get().val() 
+         username = superuser_data.get('username')
+         context = {"books": books, "genre": genre, 'uid': uid, 'username' :username, 'is_superuser': is_superuser}   
+         return render(request, 'books_by/books_by_genre.html', context)
+     
+       else: 
+         # Retrieve the user data from the Firebase's database
+         user_data = database.child('Users').child(uid).get().val()
+         username = user_data.get('username')
+         context = {"books": books, "genre": genre, 'uid': uid, 'username' :username}
+         return render(request, 'books_by/books_by_genre.html', context)
+    else:
+        context = {"books": books, "genre": genre}
+        return render(request, 'books_by/books_by_genre.html', context)

@@ -594,8 +594,8 @@ def upload(request):
 
     username = is_superuser.get('username')
 
-    publishers = database.child('Publishers').get().val()  # Retrieve all publishers from the database
-    authors = database.child('Authors').get().val()  # Retrieve all authors from the database
+    publishers = database.child('Publishers').get().val()  
+    authors = database.child('Authors').get().val()  
 
     if request.method == 'POST':
         form = BookForm(request.POST, publishers=publishers, authors=authors)
